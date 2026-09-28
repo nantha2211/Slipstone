@@ -1,0 +1,703 @@
+<title>Slipstone</title>
+<meta name="description" content="Slipstone — a sliding-stone puzzle roguelite. Beat the AI's par, go deeper, come back for the Daily Trio.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;800;900&family=Figtree:wght@400;500;600;700&display=swap">
+<style>
+:root{
+  color-scheme: dark;
+  --bg:#0A151E; --bg-glow:#16303F;
+  --panel:#112330; --panel-2:#162D3C; --line:#23404F;
+  --ice:#15303F; --ice-hi:#1C3D4F; --ice-line:#244A5C;
+  --rock:#4A565E; --rock-hi:#6A7780; --rock-lo:#323B42;
+  --grit:#B89E6C; --grit-lo:#8A7550;
+  --ink:#E6EFF2; --muted:#8DA3AF; --faint:#5E7785;
+  --amber:#F2B84B; --amber-ink:#2A1C04;
+  --red:#DE5347; --blue:#3F7FCC; --white:#EAF2F5; --teal:#7FE3D2; --violet:#9C8CF2;
+  --good:#6BD08F; --ok:#F2B84B; --bad:#E77B55;
+  --stone:#DE5347;
+  --display:"Big Shoulders Display", "Arial Narrow", Impact, sans-serif;
+  --body:Figtree, system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0; background-color:var(--bg);
+  background-image:radial-gradient(120% 60% at 50% -10%, var(--bg-glow) 0%, var(--bg) 62%);
+  color:var(--ink); font:15px/1.45 var(--body);
+  -webkit-tap-highlight-color:transparent; overscroll-behavior:none;
+}
+button{font:inherit;color:inherit;cursor:pointer;border:0;background:none}
+button:focus-visible,.btn:focus-visible{outline:2px solid var(--teal);outline-offset:2px}
+.num{font-variant-numeric:tabular-nums}
+#app{max-width:480px;margin:0 auto;padding-inline:16px;padding-block:14px 24px;min-height:100%;display:flex;flex-direction:column}
+.screen{display:flex;flex-direction:column;gap:14px;flex:1}
+.label{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);font-weight:600}
+
+/* ---------- buttons ---------- */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border-radius:12px;padding:12px 16px;font-weight:700;transition:transform .08s, background .15s, opacity .15s}
+.btn:active{transform:translateY(1px) scale(.99)}
+.btn-primary{background:var(--amber);color:var(--amber-ink);box-shadow:0 4px 0 #B9852A}
+.btn-primary:active{box-shadow:0 2px 0 #B9852A;transform:translateY(2px)}
+.btn-ghost{background:var(--panel-2);border:1px solid var(--line)}
+.btn[disabled]{opacity:.4;cursor:not-allowed}
+.btn-sm{padding:8px 12px;font-size:13px;border-radius:10px}
+.wide{width:100%}
+
+/* ---------- home ---------- */
+.brand{padding-top:18px;text-align:center}
+.brand h1{font:900 clamp(56px,17vw,84px)/.86 var(--display);letter-spacing:.02em;margin:0;text-transform:uppercase}
+.brand h1 span{color:var(--amber)}
+.brand p{margin:10px auto 0;color:var(--muted);max-width:32ch;text-wrap:balance}
+.sheet{position:relative;height:64px;margin:6px auto 0;width:min(100%,340px);border-radius:32px;background:linear-gradient(180deg,var(--ice-hi),var(--ice));border:1px solid var(--ice-line);overflow:hidden}
+.sheet .house{position:absolute;right:10px;top:6px;width:52px;height:52px}
+.sheet .mini-stone{position:absolute;left:14px;top:17px;width:30px;height:30px;animation:throw 3.6s cubic-bezier(.15,.7,.25,1) infinite}
+.sheet .streak{position:absolute;left:14px;top:30px;height:4px;border-radius:2px;background:linear-gradient(90deg,transparent,rgba(127,227,210,.35));animation:streak 3.6s cubic-bezier(.15,.7,.25,1) infinite}
+@keyframes throw{0%,8%{transform:translateX(0)}55%,88%{transform:translateX(calc(min(100vw - 32px,340px) - 84px))}100%{transform:translateX(calc(min(100vw - 32px,340px) - 84px));opacity:0}}
+@keyframes streak{0%,8%{width:0;opacity:0}40%{opacity:1}55%{width:calc(min(100vw - 32px,340px) - 110px);opacity:.8}88%,100%{opacity:0;width:calc(min(100vw - 32px,340px) - 110px)}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:16px;display:flex;flex-direction:column;gap:12px}
+.card-head{display:flex;justify-content:space-between;align-items:baseline;gap:12px}
+.card h2{font:800 30px/1 var(--display);text-transform:uppercase;letter-spacing:.02em;margin:0}
+.card .sub{color:var(--muted);font-size:14px;margin:0}
+.pill{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;font-size:12px;font-weight:700;background:var(--panel-2);border:1px solid var(--line);white-space:nowrap}
+.pill.hot{background:rgba(242,184,75,.14);border-color:rgba(242,184,75,.4);color:var(--amber)}
+.pill.cool{background:rgba(127,227,210,.1);border-color:rgba(127,227,210,.35);color:var(--teal)}
+.row{display:flex;gap:10px;flex-wrap:wrap}
+.row > .btn{flex:1}
+.chips{display:flex;gap:6px}
+.chip{width:30px;height:30px;border-radius:8px;display:grid;place-items:center;font:800 15px var(--display)}
+.chip.p{background:var(--good);color:#0B2615}.chip.o1{background:var(--ok);color:var(--amber-ink)}.chip.o2{background:var(--bad);color:#2B0E05}.chip.e{background:var(--panel-2);border:1px dashed var(--line)}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;text-align:center}
+.stat b{display:block;font:800 26px/1 var(--display)}
+.stat span{font-size:11px;color:var(--muted);letter-spacing:.1em;text-transform:uppercase}
+.foot{margin-top:auto;padding-top:8px;text-align:center;color:var(--faint);font-size:12px}
+.foot button{color:var(--muted);text-decoration:underline;text-underline-offset:3px}
+
+/* ---------- game ---------- */
+.topbar{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.title-small{font:800 22px/1 var(--display);text-transform:uppercase;letter-spacing:.04em}
+.hud{display:grid;grid-template-columns:1.4fr 1fr 1fr;gap:8px}
+.hud .box{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:8px 12px;position:relative}
+.hud .box b{display:block;font:900 32px/1 var(--display)}
+.hud .box.bank b{color:var(--amber)}
+.hud .box.bank.low b{color:var(--bad);animation:pulse .8s infinite alternate}
+@keyframes pulse{to{opacity:.55}}
+.hud .box small{display:block;color:var(--muted);font-size:11px;letter-spacing:.1em;text-transform:uppercase;font-weight:600}
+.floaty{position:absolute;right:10px;top:6px;font:800 18px var(--display);color:var(--good);pointer-events:none;animation:floaty 1.2s ease-out forwards}
+.floaty.neg{color:var(--bad)}
+@keyframes floaty{from{transform:translateY(6px);opacity:0}20%{opacity:1}to{transform:translateY(-18px);opacity:0}}
+.board-wrap{position:relative;touch-action:none;user-select:none;-webkit-user-select:none;display:flex;justify-content:center;padding:10px;border-radius:22px;background:linear-gradient(180deg,#0E2230,#0B1B26);border:1px solid var(--line)}
+.board{position:relative;display:grid;gap:3px;width:100%;max-width:420px}
+.cell{position:relative;border-radius:7px;background:linear-gradient(160deg,var(--ice-hi),var(--ice));aspect-ratio:1}
+.cell::after{content:"";position:absolute;inset:0;border-radius:inherit;background:rgba(127,227,210,.28);opacity:0;transition:opacity .5s}
+.cell.trail::after{opacity:1;transition:opacity .05s}
+.cell.rock{background:linear-gradient(150deg,var(--rock-hi),var(--rock) 45%,var(--rock-lo));box-shadow:inset 0 -3px 0 rgba(0,0,0,.25),inset 0 1px 0 rgba(255,255,255,.12)}
+.cell.grit{background:radial-gradient(circle at 25% 30%,var(--grit-lo) 0 6%,transparent 7%),radial-gradient(circle at 70% 60%,var(--grit-lo) 0 5%,transparent 6%),radial-gradient(circle at 40% 78%,var(--grit-lo) 0 5%,transparent 6%),radial-gradient(circle at 80% 22%,var(--grit-lo) 0 4%,transparent 5%),var(--grit)}
+.house{border-radius:50%;background:radial-gradient(circle,var(--white) 0 13%,var(--red) 14% 31%,var(--white) 32% 49%,var(--blue) 50% 70%,transparent 71%)}
+.cell .house{position:absolute;inset:4%;animation:houseglow 2.4s ease-in-out infinite}
+@keyframes houseglow{50%{filter:drop-shadow(0 0 6px rgba(63,127,204,.8))}}
+.cell .rift{position:absolute;inset:14%;border-radius:50%;background:conic-gradient(var(--teal),var(--violet),var(--teal),var(--violet),var(--teal));animation:spin 2.6s linear infinite;box-shadow:0 0 12px rgba(156,140,242,.6)}
+.cell .rift::after{content:"";position:absolute;inset:26%;border-radius:50%;background:var(--bg)}
+@keyframes spin{to{transform:rotate(360deg)}}
+.cell .gem{position:absolute;inset:32%;transform:rotate(45deg);border-radius:3px;background:linear-gradient(135deg,#C8FFF5,var(--teal));box-shadow:0 0 10px rgba(127,227,210,.8);animation:bob 1.6s ease-in-out infinite}
+@keyframes bob{50%{transform:rotate(45deg) scale(.86)}}
+.cell .gem.got{animation:got .35s ease-out forwards}
+@keyframes got{to{transform:rotate(45deg) scale(2.2);opacity:0}}
+.stone{position:absolute;left:0;top:0;z-index:3;will-change:transform;pointer-events:none}
+.stone-body{position:absolute;inset:8%;border-radius:50%;background:radial-gradient(circle at 35% 30%,#9aa6ad,#5b666d 55%,#39424a);box-shadow:0 3px 0 rgba(0,0,0,.35),0 0 0 3px var(--stone) inset}
+.stone-body::before{content:"";position:absolute;inset:26%;border-radius:50%;background:var(--stone);box-shadow:inset 0 2px 0 rgba(255,255,255,.3)}
+.stone-body::after{content:"";position:absolute;left:34%;right:34%;top:44%;height:14%;border-radius:4px;background:#f3f6f8;box-shadow:0 1px 0 rgba(0,0,0,.3)}
+.stone.squash .stone-body{animation:squash .22s ease-out}
+@keyframes squash{40%{transform:scale(1.12,.88)}}
+.hint-arrow{position:absolute;inset:0;display:grid;place-items:center;font:900 26px var(--display);color:var(--amber);text-shadow:0 0 8px rgba(0,0,0,.8);z-index:4}
+.hint-arrow i{font-style:normal;animation:nudge .7s ease-in-out infinite alternate}
+@keyframes nudge{to{transform:translate(var(--hx),var(--hy))}}
+.toast{min-height:42px;display:flex;align-items:center;justify-content:center;text-align:center;color:var(--ink);font-size:14px;padding:6px 12px;border-radius:12px;background:rgba(127,227,210,.08);border:1px solid rgba(127,227,210,.2);transition:opacity .3s}
+.toast:empty{opacity:0}
+.controls{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center}
+.tools{display:flex;flex-direction:column;gap:8px}
+.tools .btn{justify-content:space-between}
+.tools .btn em{font-style:normal;font:800 16px var(--display);color:var(--amber)}
+.dpad{display:grid;grid-template-columns:repeat(3,52px);grid-template-rows:repeat(3,44px);gap:4px}
+.dpad button{background:var(--panel-2);border:1px solid var(--line);border-radius:10px;font:900 20px var(--display)}
+.dpad button:active{background:var(--line)}
+.dpad .u{grid-column:2;grid-row:1}.dpad .l{grid-column:1;grid-row:2}.dpad .r{grid-column:3;grid-row:2}.dpad .d{grid-column:2;grid-row:3}
+.dpad .c{grid-column:2;grid-row:2;display:grid;place-items:center;color:var(--faint);font-size:10px;letter-spacing:.1em}
+.shake{animation:shake .3s}
+@keyframes shake{25%{transform:translateX(-4px)}75%{transform:translateX(4px)}}
+
+/* ---------- overlay ---------- */
+.overlay{position:fixed;inset:0;z-index:20;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(5,12,18,.72);backdrop-filter:blur(4px)}
+.modal{width:min(100%,420px);background:var(--panel);border:1px solid var(--line);border-radius:22px;padding:22px 18px;display:flex;flex-direction:column;gap:14px;animation:pop .28s cubic-bezier(.2,1.4,.4,1);max-height:calc(100% - 20px);overflow:auto}
+@keyframes pop{from{transform:scale(.9);opacity:0}}
+.modal h3{font:900 40px/.95 var(--display);text-transform:uppercase;margin:0;text-wrap:balance}
+.modal h3.good{color:var(--good)}.modal h3.warn{color:var(--amber)}
+.modal p{margin:0;color:var(--muted)}
+.ledger{display:flex;flex-direction:column;gap:6px;background:var(--bg);border-radius:12px;padding:12px}
+.ledger div{display:flex;justify-content:space-between;font-variant-numeric:tabular-nums}
+.ledger div b{color:var(--good)}
+.ledger div.tot{border-top:1px solid var(--line);padding-top:6px;font-weight:700}
+.perks{display:grid;gap:10px}
+.perk{text-align:left;background:var(--panel-2);border:1px solid var(--line);border-radius:14px;padding:12px 14px;display:grid;grid-template-columns:44px 1fr;gap:12px;align-items:center;transition:border-color .15s,transform .1s}
+.perk:hover{border-color:var(--amber)}
+.perk .ico{width:44px;height:44px;border-radius:12px;display:grid;place-items:center;font:900 22px var(--display);background:var(--bg);color:var(--amber)}
+.perk b{display:block;font:800 20px/1.1 var(--display);text-transform:uppercase;letter-spacing:.02em}
+.perk span{color:var(--muted);font-size:13px}
+.progress{height:10px;border-radius:5px;background:var(--bg);overflow:hidden}
+.progress i{display:block;height:100%;background:linear-gradient(90deg,var(--amber),#FFD98A);border-radius:5px;transition:width .8s ease-out}
+.newbest{align-self:flex-start}
+.confetti{position:fixed;width:8px;height:12px;z-index:30;pointer-events:none;border-radius:2px}
+
+/* ---------- workshop ---------- */
+.shop-item{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;padding:12px 0;border-top:1px solid var(--line)}
+.shop-item:first-of-type{border-top:0}
+.shop-item b{font:800 20px/1.1 var(--display);text-transform:uppercase}
+.shop-item p{margin:2px 0 0;color:var(--muted);font-size:13px}
+.lvl{display:inline-flex;gap:3px;margin-left:6px;vertical-align:middle}
+.lvl i{width:8px;height:8px;border-radius:2px;background:var(--line)}.lvl i.on{background:var(--amber)}
+.skins{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+.skin{display:flex;flex-direction:column;align-items:center;gap:4px;padding:8px 2px;border-radius:12px;border:1px solid var(--line);background:var(--panel-2);font-size:11px;color:var(--muted)}
+.skin.sel{border-color:var(--amber);color:var(--ink)}
+.skin .sw{width:32px;height:32px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#9aa6ad,#5b666d 55%,#39424a);box-shadow:0 0 0 3px var(--c) inset;position:relative}
+.skin .sw::before{content:"";position:absolute;inset:28%;border-radius:50%;background:var(--c)}
+.granite{display:inline-flex;align-items:center;gap:6px;font:800 20px var(--display)}
+.granite::before{content:"";width:12px;height:12px;border-radius:3px;transform:rotate(45deg);background:linear-gradient(135deg,#aeb8be,#5b666d)}
+.howto{display:grid;gap:10px}
+.howto div{display:grid;grid-template-columns:40px 1fr;gap:12px;align-items:center;font-size:14px}
+.howto .t{width:40px;height:40px;border-radius:8px;position:relative;background:linear-gradient(160deg,var(--ice-hi),var(--ice))}
+@media (prefers-reduced-motion:reduce){*{animation-duration:.001s!important;animation-iteration-count:1!important;transition-duration:.001s!important}}
+@media (max-width:380px){.dpad{grid-template-columns:repeat(3,44px);grid-template-rows:repeat(3,40px)}.hud .box b{font-size:26px}}
+</style>
+
+<div id="app"></div>
+<div id="overlay-root"></div>
+
+<script>
+// ============================ ENGINE START ============================
+// Pure game logic (no DOM). Shared by the game and by the node test script.
+const DIRS = { up:[-1,0], down:[1,0], left:[0,-1], right:[0,1] };
+const DKEYS = ['up','right','down','left'];
+const T = { ICE:0, ROCK:1, GRIT:2, GOAL:3, PORTAL:5 };
+
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+function hashStr(s){let h=2166136261;for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619)}return h>>>0}
+
+// Slide the stone from cell `from` in direction d until something stops it.
+// Returns segments (split at rift teleports) so the renderer can animate them.
+function slide(L, from, d){
+  const [dr,dc] = DIRS[d];
+  let r = Math.floor(from/L.w), c = from%L.w, cur = from, win = false, steps = 0;
+  const segs = [[from]];
+  while (steps++ < 200){
+    const nr=r+dr, nc=c+dc;
+    if (nr<0||nc<0||nr>=L.h||nc>=L.w) break;
+    const ni = nr*L.w+nc, t = L.grid[ni];
+    if (t===T.ROCK) break;
+    r=nr; c=nc; cur=ni; segs[segs.length-1].push(ni);
+    if (t===T.GOAL){ win=true; break; }
+    if (t===T.GRIT) break;
+    if (t===T.PORTAL){
+      const o = L.portals[0]===ni ? L.portals[1] : L.portals[0];
+      cur=o; r=Math.floor(o/L.w); c=o%L.w; segs.push([o]);
+    }
+  }
+  const moved = cur!==from || segs.length>1 || segs[0].length>1;
+  return { end:cur, segs, win, moved };
+}
+
+// Breadth-first search over stone positions: the "AI" that sets par and gives hints.
+function solve(L, from){
+  const N = L.w*L.h, prev = new Int32Array(N).fill(-2), pdir = new Array(N);
+  prev[from] = -1; const q=[from]; let qi=0;
+  while (qi<q.length){
+    const p = q[qi++];
+    for (const d of DKEYS){
+      const s = slide(L,p,d);
+      if (!s.moved) continue;
+      if (s.win){
+        const path=[d]; let x=p;
+        while (prev[x]!==-1){ path.unshift(pdir[x]); x=prev[x]; }
+        return { par:path.length, path };
+      }
+      if (prev[s.end]===-2){ prev[s.end]=p; pdir[s.end]=d; q.push(s.end); }
+    }
+  }
+  return null;
+}
+
+// Every cell the stone can pass over from the start (used to place gems on real lines).
+function traversed(L){
+  const seen=new Set([L.start]), cells=new Set(), q=[L.start]; let qi=0;
+  while(qi<q.length){ const p=q[qi++];
+    for(const d of DKEYS){ const s=slide(L,p,d); if(!s.moved||s.win) { if(s.win) s.segs.flat().forEach(x=>cells.add(x)); continue; }
+      s.segs.flat().forEach(x=>cells.add(x));
+      if(!seen.has(s.end)){ seen.add(s.end); q.push(s.end); } } }
+  return [...cells];
+}
+
+function difficulty(d){
+  const size = Math.min(5 + Math.floor((d-1)/3), 9);
+  const minPar = Math.min(2 + Math.floor((d-1)/2), 11);
+  const maxPar = minPar + (d>6 ? 2 : 1);
+  return { size, minPar, maxPar,
+    wall: 0.10 + Math.min(d,14)*0.007,
+    grit: d>=2 ? Math.min(1+Math.floor(d/3), 4) : 0,
+    portalChance: d>=5 ? 0.5 : 0 };
+}
+
+// Procedural generator: roll random ice, let the solver rate it, keep the one that hits the target par.
+function genLevel(seed, d){
+  const rng = mulberry32(seed), P = difficulty(d);
+  const w=P.size, h=P.size, N=w*h;
+  const pick = (grid)=>{ for(let k=0;k<200;k++){ const i=Math.floor(rng()*N); if(grid[i]===T.ICE) return i; } return -1; };
+  let best=null, bestScore=1e9;
+  for (let a=0; a<700; a++){
+    const grid = new Int8Array(N);
+    const dens = P.wall + rng()*0.06;
+    for (let i=0;i<N;i++) if (rng()<dens) grid[i]=T.ROCK;
+    const gritN = P.grit ? Math.floor(rng()*(P.grit+1)) : 0;
+    for (let k=0;k<gritN;k++){ const i=pick(grid); if(i>=0) grid[i]=T.GRIT; }
+    let portals=null;
+    if (rng()<P.portalChance){ const a1=pick(grid); if(a1>=0){ grid[a1]=T.PORTAL; const b1=pick(grid); if(b1>=0){ grid[b1]=T.PORTAL; portals=[a1,b1]; } else grid[a1]=T.ICE; } }
+    const start = pick(grid); if (start<0) continue;
+    grid[start]=T.GRIT; const goal = pick(grid); grid[start]=T.ICE; if (goal<0) continue;
+    grid[goal]=T.GOAL;
+    const L = { w, h, grid, start, goal, portals, gems:[] };
+    const sol = solve(L, start); if (!sol) continue;
+    L.par = sol.par; L.solution = sol.path;
+    // Prefer levels that land in the target band and that actually use the rift if one exists.
+    const usesRift = portals ? usesPortal(L) : true;
+    const score = (sol.par<P.minPar ? (P.minPar-sol.par)*2 : sol.par>P.maxPar ? sol.par-P.maxPar : 0) + (usesRift?0:0.5);
+    if (score<bestScore){ best=L; bestScore=score; }
+    if (score===0) break;
+  }
+  // Gems: 0–2 shards placed on cells the stone can actually pass over.
+  const cand = traversed(best).filter(i=>best.grid[i]===T.ICE && i!==best.start);
+  const gemN = d<=1 ? 1 : Math.floor(rng()*3);
+  for (let k=0;k<gemN && cand.length;k++){ const j=Math.floor(rng()*cand.length); best.gems.push(cand.splice(j,1)[0]); }
+  best.seed=seed; best.d=d;
+  return best;
+}
+function usesPortal(L){ let p=L.start; for(const d of L.solution){ const s=slide(L,p,d); if(s.segs.length>1) return true; p=s.end; } return false; }
+
+function parseLevel(rows){
+  const h=rows.length, w=rows[0].length, grid=new Int8Array(w*h); let start=0, goal=0; const gems=[], portals=[];
+  rows.forEach((row,r)=>[...row].forEach((ch,c)=>{ const i=r*w+c;
+    if(ch==='#')grid[i]=T.ROCK; else if(ch==='o')grid[i]=T.GRIT; else if(ch==='G'){grid[i]=T.GOAL;goal=i}
+    else if(ch==='S')start=i; else if(ch==='*')gems.push(i); else if(ch==='P'){grid[i]=T.PORTAL;portals.push(i)} }));
+  const L={w,h,grid,start,goal,gems,portals:portals.length===2?portals:null};
+  const sol=solve(L,start); L.par=sol.par; L.solution=sol.path; return L;
+}
+const TUTORIAL = [
+  { rows:["..*.G",".....",".....",".....","S...."], tip:"Swipe, use arrow keys, or tap the pad. The stone slides until something stops it. Reach the house." },
+  { rows:["....*",".....","..G..",".....","S..#."], tip:"Rocks stop the stone. Use them as backstops to land where you need to." },
+  { rows:["....*",".G...",".....","#....",".o..S"], tip:"Sand grabs the stone. Match the AI's par to earn a +2 Perfect bonus." },
+];
+// ============================ ENGINE END ============================
+</script>
+
+<script>
+// ============================ META / SAVE ============================
+const SKINS = [
+  {id:'crimson', name:'Crimson', c:'#DE5347', cost:0},
+  {id:'glacier', name:'Glacier', c:'#4FA3E8', cost:12},
+  {id:'amber',   name:'Amber',   c:'#F2B84B', cost:12},
+  {id:'moss',    name:'Moss',    c:'#6BD08F', cost:12},
+  {id:'violet',  name:'Violet',  c:'#9C8CF2', cost:12},
+];
+const UPGRADES = [
+  {id:'pockets', name:'Deep Pockets', desc:'Start every run with +2 moves in the bank.', costs:[8,20,40]},
+  {id:'scout',   name:'Scout Kit',    desc:'Start every run with +1 AI hint.',            costs:[15,35]},
+  {id:'glove',   name:'Rewind Glove', desc:'Start every run with +1 undo.',               costs:[10,30]},
+];
+const PERKS = [
+  {id:'thermos', ico:'+4', name:'Thermos',     desc:'Add 4 moves to your bank right now.'},
+  {id:'scout',   ico:'?',  name:'Scout',       desc:'+1 AI hint. The solver shows the best next slide.'},
+  {id:'rewind',  ico:'↶',  name:'Rewind',      desc:'+2 undos. Each undo refunds the move.'},
+  {id:'magnet',  ico:'◆',  name:'Magnet',      desc:'Shards are worth +1 more move each.'},
+  {id:'sweep',   ico:'★',  name:'Clean Sweep', desc:'Perfect ends pay +1 more move.'},
+  {id:'wind',    ico:'∞',  name:'Second Wind', desc:'The first time you hit 0 moves, get 4 back.'},
+];
+const BASE_BANK = 10;
+const KEY='slipstone.v1';
+const defaults = ()=>({granite:0, up:{pockets:0,scout:0,glove:0}, skins:['crimson'], skin:'crimson', best:0, runs:0, perfects:0,
+  tutorialDone:false, freshDay:'', daily:{day:'', idx:0, results:[], done:false}, streak:0, lastDaily:'', bestStreak:0, muted:false, seenRift:false, seenHowto:false});
+let S = defaults();
+try { const raw=localStorage.getItem(KEY); if(raw) S=Object.assign(defaults(), JSON.parse(raw)); } catch(e){}
+function save(){ try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){} }
+
+function dayKey(dt=new Date()){ const z=n=>String(n).padStart(2,'0'); return dt.getFullYear()+'-'+z(dt.getMonth()+1)+'-'+z(dt.getDate()); }
+function yesterdayKey(){ const d=new Date(); d.setDate(d.getDate()-1); return dayKey(d); }
+function dailyNumber(){ const a=new Date(2026,8,1), b=new Date(); b.setHours(0,0,0,0); return Math.round((b-a)/864e5)+1; }
+function untilMidnight(){ const n=new Date(), m=new Date(n); m.setHours(24,0,0,0); let s=Math.max(0,Math.floor((m-n)/1000)); const z=x=>String(x).padStart(2,'0'); return z(Math.floor(s/3600))+':'+z(Math.floor(s%3600/60))+':'+z(s%60); }
+function freshIceAvailable(){ return S.freshDay!==dayKey(); }
+function skinColor(){ return (SKINS.find(s=>s.id===S.skin)||SKINS[0]).c; }
+
+// ============================ AUDIO ============================
+let AC=null;
+function ac(){ if(S.muted) return null; if(!AC){ try{ AC=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){ return null; } } if(AC.state==='suspended') AC.resume(); return AC; }
+function tone(f,dur,type='sine',vol=.12,to){ const a=ac(); if(!a) return; const o=a.createOscillator(), g=a.createGain(), t=a.currentTime;
+  o.type=type; o.frequency.setValueAtTime(f,t); if(to) o.frequency.exponentialRampToValueAtTime(to,t+dur);
+  g.gain.setValueAtTime(vol,t); g.gain.exponentialRampToValueAtTime(.0001,t+dur); o.connect(g).connect(a.destination); o.start(t); o.stop(t+dur); }
+function whoosh(dur){ const a=ac(); if(!a) return; const n=Math.floor(a.sampleRate*dur), b=a.createBuffer(1,n,a.sampleRate), ch=b.getChannelData(0);
+  for(let i=0;i<n;i++) ch[i]=(Math.random()*2-1)*(1-i/n);
+  const s=a.createBufferSource(), f=a.createBiquadFilter(), g=a.createGain(), t=a.currentTime; s.buffer=b; f.type='bandpass'; f.frequency.setValueAtTime(1800,t); f.frequency.exponentialRampToValueAtTime(500,t+dur); g.gain.value=.08;
+  s.connect(f).connect(g).connect(a.destination); s.start(); }
+const sfx = {
+  slide:(d)=>whoosh(Math.min(.6,.12+d*.05)),
+  thunk:()=>tone(140,.12,'triangle',.18,70),
+  bump:()=>tone(90,.08,'square',.05,60),
+  gem:()=>{tone(1320,.12,'sine',.08);setTimeout(()=>tone(1760,.14,'sine',.07),60)},
+  win:()=>[523,659,784,1047].forEach((f,i)=>setTimeout(()=>tone(f,.25,'triangle',.1),i*80)),
+  perfect:()=>[784,988,1175,1568].forEach((f,i)=>setTimeout(()=>tone(f,.3,'sine',.09),i*70)),
+  lose:()=>[392,330,262].forEach((f,i)=>setTimeout(()=>tone(f,.35,'triangle',.1),i*140)),
+  click:()=>tone(660,.05,'sine',.05),
+  rift:()=>tone(300,.25,'sine',.08,1200),
+};
+
+// ============================ UI HELPERS ============================
+const app=document.getElementById('app'), ovRoot=document.getElementById('overlay-root');
+const h=(html)=>{ const t=document.createElement('template'); t.innerHTML=html.trim(); return t.content.firstElementChild; };
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+let overlayPrimary=null;
+function showOverlay(el, primary){ closeOverlay(); const o=h('<div class="overlay"></div>'); o.appendChild(el); ovRoot.appendChild(o); overlayPrimary=primary||null; const b=el.querySelector('[data-primary]'); if(b) setTimeout(()=>b.focus(),50); }
+function closeOverlay(){ ovRoot.innerHTML=''; overlayPrimary=null; }
+function confetti(n=40){ if(matchMedia('(prefers-reduced-motion: reduce)').matches) return; const cols=['#F2B84B','#7FE3D2','#DE5347','#3F7FCC','#EAF2F5'];
+  for(let i=0;i<n;i++){ const c=document.createElement('div'); c.className='confetti'; c.style.background=cols[i%cols.length]; c.style.left=(50+(Math.random()*20-10))+'vw'; c.style.top='40vh'; document.body.appendChild(c);
+    const dx=(Math.random()*2-1)*48, dy=-(20+Math.random()*40); c.animate([{transform:'translate(0,0) rotate(0)',opacity:1},{transform:`translate(${dx}vw,${dy}vh) rotate(${Math.random()*720}deg)`,opacity:1,offset:.5},{transform:`translate(${dx*1.3}vw,${dy+70}vh) rotate(${Math.random()*1080}deg)`,opacity:0}],{duration:1400+Math.random()*600,easing:'cubic-bezier(.2,.6,.4,1)'}).onfinish=()=>c.remove(); } }
+document.documentElement.style.setProperty('--stone', skinColor());
+
+// ============================ HOME ============================
+let tick=null;
+function renderHome(){
+  clearInterval(tick); closeOverlay(); G=null;
+  const today=dayKey(); if(S.daily.day!==today) S.daily={day:today, idx:0, results:[], done:false};
+  if(S.lastDaily && S.lastDaily!==today && S.lastDaily!==yesterdayKey()) S.streak=0;
+  save();
+  const d=S.daily, fresh=freshIceAvailable();
+  const chips=[0,1,2].map(i=>chipHtml(d.results[i])).join('');
+  const next=nextUnlock();
+  app.innerHTML='';
+  const el=h(`<div class="screen">
+    <header class="brand">
+      <h1>Slip<span>stone</span></h1>
+      <div class="sheet" aria-hidden="true"><div class="streak"></div><div class="house"></div><div class="mini-stone"><div class="stone-body" style="inset:0"></div></div></div>
+      <p>Slide the stone into the house. The AI already knows the shortest line. Can you match it?</p>
+    </header>
+    <section class="card">
+      <div class="card-head"><h2>Run</h2>${S.best?`<span class="pill">Best: End <b class="num">${S.best}</b></span>`:`<span class="pill cool">New</span>`}</div>
+      <p class="sub">Every slide spends a move from your bank. Match the AI's par to earn moves back. Go as deep as you can.</p>
+      ${fresh?`<span class="pill hot" style="align-self:flex-start">Fresh ice today: first run earns 2× granite</span>`:''}
+      <button class="btn btn-primary wide" id="play" data-primary>${S.runs?'Start run':'Play first run'}</button>
+      ${next?`<div><div class="card-head" style="margin-bottom:6px"><span class="label">Next unlock: ${esc(next.name)}</span><span class="label num">${Math.min(S.granite,next.cost)}/${next.cost}</span></div><div class="progress"><i style="width:${Math.min(100,S.granite/next.cost*100)}%"></i></div></div>`:''}
+    </section>
+    <section class="card">
+      <div class="card-head"><h2>Daily Trio <span class="num" style="color:var(--muted);font-size:22px">#${dailyNumber()}</span></h2><span class="pill ${S.streak?'hot':''}">Streak <b class="num">${S.streak}</b></span></div>
+      <p class="sub">${d.done?'Done for today. New puzzles in <b class="num" id="cd">'+untilMidnight()+'</b>':'Three puzzles, same for every player today. Score against the AI par.'}</p>
+      <div class="card-head"><div class="chips">${chips}</div>
+        ${d.done?`<button class="btn btn-ghost btn-sm" id="share">Copy result</button>`:`<button class="btn btn-ghost btn-sm" id="daily">${d.idx?'Resume '+(d.idx+1)+'/3':'Play daily'}</button>`}</div>
+    </section>
+    <div class="row">
+      <button class="btn btn-ghost" id="shop">Workshop <span class="granite num">${S.granite}</span></button>
+      <button class="btn btn-ghost" id="how">How to play</button>
+    </div>
+    <div class="stats card" style="display:grid">
+      <div class="stat"><b class="num">${S.runs}</b><span>Runs</span></div>
+      <div class="stat"><b class="num">${S.perfects}</b><span>Perfects</span></div>
+      <div class="stat"><b class="num">${S.bestStreak}</b><span>Best streak</span></div>
+    </div>
+    <p class="foot">Prototype build · <button id="mute">${S.muted?'Sound off':'Sound on'}</button> · <button id="reset">Reset save</button></p>
+  </div>`);
+  app.appendChild(el);
+  el.querySelector('#play').onclick=()=>{ sfx.click(); startRun(); };
+  el.querySelector('#shop').onclick=()=>{ sfx.click(); renderShop(); };
+  el.querySelector('#how').onclick=()=>showHowto();
+  el.querySelector('#mute').onclick=()=>{ S.muted=!S.muted; save(); renderHome(); };
+  el.querySelector('#reset').onclick=()=>confirmReset();
+  const db=el.querySelector('#daily'); if(db) db.onclick=()=>{ sfx.click(); startDaily(); };
+  const sb=el.querySelector('#share'); if(sb) sb.onclick=(e)=>copyShare(e.currentTarget);
+  if(d.done) tick=setInterval(()=>{ const c=document.getElementById('cd'); if(c) c.textContent=untilMidnight(); if(dayKey()!==S.daily.day) renderHome(); },1000);
+}
+function chipHtml(r){ if(!r) return '<span class="chip e"></span>'; const o=r.moves-r.par; return `<span class="chip ${o<=0?'p':o===1?'o1':'o2'} num" title="${r.moves} moves, par ${r.par}">${o<=0?'★':'+'+o}</span>`; }
+function nextUnlock(){ const opts=[]; UPGRADES.forEach(u=>{ const l=S.up[u.id]; if(l<u.costs.length) opts.push({name:u.name+' '+'I'.repeat(l+1), cost:u.costs[l]}); });
+  SKINS.forEach(s=>{ if(!S.skins.includes(s.id)) opts.push({name:s.name+' stone', cost:s.cost}); });
+  opts.sort((a,b)=>a.cost-b.cost); return opts.find(o=>o.cost>S.granite)||opts[0]||null; }
+function shareText(){ const d=S.daily, tot=d.results.reduce((a,r)=>a+r.moves-r.par,0);
+  const sq=d.results.map(r=>{const o=r.moves-r.par; return o<=0?'🟩':o===1?'🟨':'🟧';}).join('');
+  return `Slipstone Daily #${dailyNumber()}\n${sq}  ${tot===0?'Matched the AI':'+'+tot+' over AI par'}\nStreak ${S.streak}`; }
+function copyShare(btn){ const t=shareText(); const done=()=>{ btn.textContent='Copied'; setTimeout(()=>btn.textContent='Copy result',1500); };
+  try{ navigator.clipboard.writeText(t).then(done,()=>fallbackCopy(t,btn)); }catch(e){ fallbackCopy(t,btn); } }
+function fallbackCopy(t,btn){ const m=h(`<div class="modal"><h3>Your result</h3><p>Select and copy:</p><textarea id="sharebox" rows="4" style="width:100%;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:10px;font:inherit">${esc(t)}</textarea><button class="btn btn-primary" data-primary>Close</button></div>`);
+  m.querySelector('button').onclick=()=>closeOverlay(); showOverlay(m, closeOverlay); const ta=m.querySelector('textarea'); ta.focus(); ta.select(); }
+function confirmReset(){ const m=h(`<div class="modal"><h3 class="warn">Reset save?</h3><p>This clears granite, unlocks, streak and stats on this device.</p><div class="row"><button class="btn btn-ghost" id="no">Keep</button><button class="btn btn-primary" id="yes">Reset</button></div></div>`);
+  m.querySelector('#no').onclick=closeOverlay; m.querySelector('#yes').onclick=()=>{ S=defaults(); save(); document.documentElement.style.setProperty('--stone', skinColor()); renderHome(); }; showOverlay(m); }
+function showHowto(onDone){
+  const m=h(`<div class="modal"><h3>How to play</h3><div class="howto">
+    <div><span class="t"><span class="stone" style="position:absolute;inset:0;width:100%;height:100%"><span class="stone-body"></span></span></span><span>Your stone slides until something stops it. It can't stop in the middle of open ice.</span></div>
+    <div><span class="t"><span class="house" style="position:absolute;inset:4%"></span></span><span>Land in the house to clear the end. The AI's par is the fewest slides possible.</span></div>
+    <div><span class="t cell rock" style="aspect-ratio:auto"></span><span>Rocks block you. Sand stops you on top of it.</span></div>
+    <div><span class="t"><span class="rift" style="position:absolute;inset:14%;border-radius:50%;background:conic-gradient(var(--teal),var(--violet),var(--teal));"></span></span><span>Rifts teleport the stone to their twin and it keeps sliding.</span></div>
+    <div><span class="t"><span class="gem" style="position:absolute;inset:32%;transform:rotate(45deg);border-radius:3px;background:var(--teal)"></span></span><span>Shards pay +1 move when you clear the end.</span></div>
+  </div><p>Runs: every slide costs a move. Clearing pays back the par, +2 for a Perfect. Run out and the run ends. Granite from each run buys permanent upgrades.</p>
+  <button class="btn btn-primary" data-primary>Got it</button></div>`);
+  const go=()=>{ closeOverlay(); onDone&&onDone(); }; m.querySelector('[data-primary]').onclick=go; showOverlay(m, go);
+}
+
+// ============================ WORKSHOP ============================
+function renderShop(){
+  closeOverlay(); app.innerHTML='';
+  const el=h(`<div class="screen">
+    <div class="topbar"><button class="btn btn-ghost btn-sm" id="back">‹ Menu</button><span class="title-small">Workshop</span><span class="granite num">${S.granite}</span></div>
+    <section class="card"><span class="label">Upgrades · permanent</span><div id="ups"></div></section>
+    <section class="card"><span class="label">Stones · cosmetic</span><div class="skins" id="skins"></div></section>
+    <p class="sub" style="color:var(--muted);text-align:center;margin:0">Earn granite from runs: 1 per end cleared, +1 per Perfect.</p>
+  </div>`);
+  const ups=el.querySelector('#ups');
+  UPGRADES.forEach(u=>{ const l=S.up[u.id], maxed=l>=u.costs.length, cost=u.costs[l];
+    const it=h(`<div class="shop-item"><div><b>${u.name}</b><span class="lvl">${u.costs.map((_,i)=>`<i class="${i<l?'on':''}"></i>`).join('')}</span><p>${u.desc}</p></div>
+      <button class="btn ${!maxed&&S.granite>=cost?'btn-primary':'btn-ghost'} btn-sm" ${maxed||S.granite<cost?'disabled':''}>${maxed?'Maxed':'<span class="granite num" style="font-size:16px">'+cost+'</span>'}</button></div>`);
+    it.querySelector('button').onclick=()=>{ if(S.granite>=cost&&!maxed){ S.granite-=cost; S.up[u.id]++; save(); sfx.perfect(); renderShop(); } };
+    ups.appendChild(it); });
+  const sk=el.querySelector('#skins');
+  SKINS.forEach(s=>{ const own=S.skins.includes(s.id);
+    const b=h(`<button class="skin ${S.skin===s.id?'sel':''}" style="--c:${s.c}"><span class="sw"></span>${own?esc(s.name):'<span class="num">◆ '+s.cost+'</span>'}</button>`);
+    b.onclick=()=>{ if(own){ S.skin=s.id; } else if(S.granite>=s.cost){ S.granite-=s.cost; S.skins.push(s.id); S.skin=s.id; sfx.perfect(); } else { b.classList.add('shake'); setTimeout(()=>b.classList.remove('shake'),300); return; }
+      save(); document.documentElement.style.setProperty('--stone', skinColor()); renderShop(); };
+    sk.appendChild(b); });
+  el.querySelector('#back').onclick=renderHome;
+  app.appendChild(el);
+}
+
+// ============================ GAME ============================
+let G=null; // current game state
+function startRun(){
+  const tut=!S.tutorialDone;
+  G={ mode:'run', end:1, seed:(Math.random()*2**32)>>>0, bank:BASE_BANK+2*S.up.pockets, hints:S.up.scout, undos:S.up.glove,
+      gemVal:1, perfBonus:2, wind:false, windUsed:false, perfects:0, cleared:0, perks:[], tut };
+  loadEnd();
+}
+function startDaily(){
+  const d=S.daily; if(d.done){ renderHome(); return; }
+  G={ mode:'daily', idx:d.idx, hints:0, undos:0 };
+  loadEnd();
+}
+function makeLevel(){
+  if(G.mode==='daily'){ const ds=[3,6,9][G.idx]; return genLevel(hashStr('slipstone-daily-'+S.daily.day+'-'+G.idx), ds); }
+  if(G.tut && G.end<=TUTORIAL.length){ const L=parseLevel(TUTORIAL[G.end-1].rows); L.tip=TUTORIAL[G.end-1].tip; return L; }
+  return genLevel((G.seed + G.end*7919)>>>0, G.end);
+}
+function loadEnd(){
+  closeOverlay();
+  const L=makeLevel();
+  G.L=L; G.pos=L.start; G.moves=0; G.gems=new Set(L.gems); G.got=0; G.hist=[]; G.busy=false; G.hintDir=null;
+  renderGame();
+  if(L.tip) toast(L.tip);
+  else if(L.portals && !S.seenRift){ S.seenRift=true; save(); toast('New: rifts. The stone enters one, exits its twin, and keeps sliding.'); }
+  else if(G.mode==='daily') toast(`Daily puzzle ${G.idx+1} of 3 · AI par ${L.par}`);
+  else toast(`End ${G.end} · the AI clears this in ${L.par}`);
+}
+let boardEl, stoneEl, cellEls=[];
+function renderGame(){
+  const L=G.L; app.innerHTML='';
+  const run=G.mode==='run';
+  const el=h(`<div class="screen" id="game">
+    <div class="topbar"><button class="btn btn-ghost btn-sm" id="menu">‹ Menu</button>
+      <span class="title-small">${run?'End <span class="num">'+G.end+'</span>':'Daily <span class="num">'+(G.idx+1)+'/3</span>'}</span>
+      <button class="btn btn-ghost btn-sm" id="snd" aria-label="Toggle sound">${S.muted?'Sound off':'Sound on'}</button></div>
+    <div class="hud">
+      <div class="box bank" id="bankbox"><small>${run?'Move bank':'Moves'}</small><b class="num" id="bank"></b></div>
+      <div class="box"><small>AI par</small><b class="num">${L.par}</b></div>
+      <div class="box"><small>${run?'Slides':'Shards'}</small><b class="num" id="mv"></b></div>
+    </div>
+    <div class="board-wrap" id="bw"><div class="board" id="board" style="grid-template-columns:repeat(${L.w},1fr)"></div></div>
+    <div class="toast" id="toast" aria-live="polite"></div>
+    <div class="controls">
+      <div class="tools">
+        <button class="btn btn-ghost btn-sm" id="undo">Undo <em class="num" id="undoN"></em></button>
+        <button class="btn btn-ghost btn-sm" id="hint">AI hint <em class="num" id="hintN"></em></button>
+        <button class="btn btn-ghost btn-sm" id="rst">Reset stone <em>R</em></button>
+      </div>
+      <div class="dpad" aria-label="Slide direction">
+        <button class="u" data-d="up" aria-label="Slide up">▲</button><button class="l" data-d="left" aria-label="Slide left">◀</button>
+        <span class="c">SLIDE</span>
+        <button class="r" data-d="right" aria-label="Slide right">▶</button><button class="d" data-d="down" aria-label="Slide down">▼</button>
+      </div>
+    </div>
+  </div>`);
+  app.appendChild(el);
+  boardEl=el.querySelector('#board'); cellEls=[];
+  for(let i=0;i<L.w*L.h;i++){ const t=L.grid[i]; const c=document.createElement('div'); c.className='cell'+(t===T.ROCK?' rock':t===T.GRIT?' grit':'');
+    if(t===T.GOAL) c.innerHTML='<div class="house"></div>';
+    if(t===T.PORTAL) c.innerHTML='<div class="rift"></div>';
+    if(G.gems.has(i)) c.innerHTML+='<div class="gem"></div>';
+    boardEl.appendChild(c); cellEls.push(c); }
+  stoneEl=h('<div class="stone"><div class="stone-body"></div></div>'); boardEl.appendChild(stoneEl);
+  requestAnimationFrame(()=>placeStone(G.pos,0));
+  el.querySelector('#menu').onclick=()=>{ if(G.mode==='run' && (G.end>1||G.moves>0)) confirmQuit(); else renderHome(); };
+  el.querySelector('#snd').onclick=(e)=>{ S.muted=!S.muted; save(); e.currentTarget.textContent=S.muted?'Sound off':'Sound on'; };
+  el.querySelector('#undo').onclick=undo; el.querySelector('#hint').onclick=hint; el.querySelector('#rst').onclick=resetStone;
+  el.querySelectorAll('.dpad button').forEach(b=>b.onclick=()=>move(b.dataset.d));
+  bindSwipe(el.querySelector('#bw'));
+  updateHud();
+}
+function placeStone(i, dur){ const c=cellEls[i]; if(!c) return; stoneEl.style.width=c.offsetWidth+'px'; stoneEl.style.height=c.offsetHeight+'px';
+  stoneEl.style.transition=dur?`transform ${dur}ms cubic-bezier(.25,.75,.3,1)`:'none'; stoneEl.style.transform=`translate(${c.offsetLeft}px,${c.offsetTop}px)`; }
+window.addEventListener('resize',()=>{ if(G&&stoneEl) placeStone(G.pos,0); });
+function updateHud(){
+  if(!G) return; const run=G.mode==='run';
+  const bank=document.getElementById('bank'); if(!bank) return;
+  bank.textContent = run?G.bank:G.moves;
+  document.getElementById('bankbox').classList.toggle('low', run && G.bank<=3);
+  document.getElementById('mv').textContent = run?G.moves:(G.got+'/'+G.L.gems.length);
+  const u=document.getElementById('undo'), hi=document.getElementById('hint');
+  document.getElementById('undoN').textContent=G.undos; document.getElementById('hintN').textContent=G.hints;
+  u.disabled = !run || G.undos<=0 || !G.hist.length; hi.disabled = !run || G.hints<=0;
+  if(!run){ u.title='No undos in the Daily'; hi.title='No hints in the Daily'; }
+}
+function floaty(txt,neg){ const b=document.getElementById('bankbox'); if(!b) return; const f=h(`<span class="floaty ${neg?'neg':''}">${txt}</span>`); b.appendChild(f); setTimeout(()=>f.remove(),1300); }
+let toastTimer=null;
+function toast(msg, ms){ const t=document.getElementById('toast'); if(!t) return; t.textContent=msg; clearTimeout(toastTimer); if(ms) toastTimer=setTimeout(()=>{ if(t.textContent===msg) t.textContent=''; },ms); }
+function clearHint(){ G.hintDir=null; const a=boardEl&&boardEl.querySelector('.hint-arrow'); if(a) a.remove(); }
+
+async function move(d){
+  if(!G || G.busy || ovRoot.firstChild) return;
+  ac();
+  const L=G.L, res=slide(L,G.pos,d);
+  if(!res.moved){ sfx.bump(); const off={up:[0,-5],down:[0,5],left:[-5,0],right:[5,0]}[d]; stoneEl.firstChild.animate([{transform:'translate(0,0)'},{transform:`translate(${off[0]}px,${off[1]}px)`},{transform:'translate(0,0)'}],{duration:160}); return; }
+  clearHint();
+  G.busy=true; G.hist.push({pos:G.pos}); G.moves++;
+  if(G.mode==='run') G.bank--;
+  updateHud();
+  const total=res.segs.reduce((a,s)=>a+s.length-1,0); sfx.slide(total);
+  for(let k=0;k<res.segs.length;k++){
+    const seg=res.segs[k];
+    if(k>0){ sfx.rift(); await stoneEl.animate([{opacity:1,transform:stoneEl.style.transform+' scale(1)'},{opacity:0,transform:stoneEl.style.transform+' scale(.3)'}],{duration:120}).finished; placeStone(seg[0],0); stoneEl.animate([{opacity:0},{opacity:1}],{duration:120}); await sleep(90); }
+    const dist=seg.length-1; if(!dist) continue;
+    const dur=Math.min(520, 70+dist*55);
+    seg.forEach((ci,j)=>setTimeout(()=>{ const c=cellEls[ci]; c.classList.add('trail'); setTimeout(()=>c.classList.remove('trail'),60);
+      if(G && G.gems.has(ci)){ G.gems.delete(ci); G.got++; const gm=c.querySelector('.gem'); if(gm) gm.classList.add('got'); sfx.gem(); updateHud(); } }, dur*(j/dist)*0.85));
+    placeStone(seg[seg.length-1], dur);
+    await sleep(dur);
+  }
+  if(!G) return;
+  G.pos=res.end; stoneEl.classList.remove('squash'); void stoneEl.offsetWidth; stoneEl.classList.add('squash');
+  if(!res.win) sfx.thunk();
+  if(res.win) return onClear();
+  G.busy=false;
+  if(G.mode==='run' && G.bank<=0){
+    if(G.wind && !G.windUsed){ G.windUsed=true; G.bank+=4; floaty('+4'); toast('Second Wind: +4 moves. Make them count.',2500); updateHud(); return; }
+    return onRunOver();
+  }
+  if(G.mode==='run'){ const over=G.moves-G.L.par; if(over===1) toast('Past par now. You can still clear it, but the Perfect bonus is gone.',2600); }
+}
+function undo(){ if(!G||G.busy||G.mode!=='run'||G.undos<=0||!G.hist.length) return; const p=G.hist.pop(); G.pos=p.pos; G.moves--; G.bank++; G.undos--; clearHint(); placeStone(G.pos,180); floaty('+1'); sfx.click(); updateHud(); }
+function resetStone(){ if(!G||G.busy) return; G.pos=G.L.start; G.hist=[]; clearHint(); placeStone(G.pos,200); sfx.click(); toast(G.mode==='run'?'Stone reset. Spent moves stay spent.':'Stone reset. Your move count keeps running.',1800); updateHud(); }
+function hint(){
+  if(!G||G.busy||G.mode!=='run'||G.hints<=0) return;
+  const sol=solve(G.L,G.pos); if(!sol) return;
+  G.hints--; clearHint(); const d=sol.path[0]; G.hintDir=d;
+  const ch={up:'▲',down:'▼',left:'◀',right:'▶'}[d], off={up:['0','-6px'],down:['0','6px'],left:['-6px','0'],right:['6px','0']}[d];
+  const a=h(`<div class="hint-arrow"><i style="--hx:${off[0]};--hy:${off[1]}">${ch}</i></div>`); stoneEl.appendChild(a);
+  toast(`AI: from here the house is ${sol.par} slide${sol.par>1?'s':''} away. Next: ${d}.`,3000); sfx.click(); updateHud();
+}
+function confirmQuit(){ const m=h(`<div class="modal"><h3 class="warn">Leave this run?</h3><p>You'll bank granite for the ${G.cleared} end${G.cleared===1?'':'s'} cleared so far.</p><div class="row"><button class="btn btn-ghost" id="stay" data-primary>Keep playing</button><button class="btn btn-primary" id="leave">End run</button></div></div>`);
+  m.querySelector('#stay').onclick=closeOverlay; m.querySelector('#leave').onclick=()=>{ closeOverlay(); onRunOver(true); }; showOverlay(m, closeOverlay); }
+
+function onClear(){
+  const L=G.L, perfect=G.moves<=L.par; confetti(perfect?60:30); perfect?sfx.perfect():sfx.win();
+  if(G.mode==='daily') return onDailyClear(perfect);
+  G.cleared++; if(perfect){ G.perfects++; S.perfects++; save(); }
+  const refund=L.par, pb=perfect?G.perfBonus:0, gb=G.got*G.gemVal, gain=refund+pb+gb;
+  G.bank+=gain; updateHud(); floaty('+'+gain);
+  const perkNext = G.end%3===0;
+  const m=h(`<div class="modal">
+    <span class="label">End ${G.end} cleared</span>
+    <h3 class="${perfect?'good':''}">${perfect?'Perfect. You matched the AI.':'Cleared. '+(G.moves-L.par)+' over par.'}</h3>
+    <div class="ledger">
+      <div><span>Your slides / AI par</span><span class="num">${G.moves} / ${L.par}</span></div>
+      <div><span>Par refund</span><b class="num">+${refund}</b></div>
+      ${perfect?`<div><span>Perfect bonus</span><b class="num">+${pb}</b></div>`:''}
+      ${G.got?`<div><span>Shards ×${G.got}</span><b class="num">+${gb}</b></div>`:''}
+      <div class="tot"><span>Move bank</span><span class="num">${G.bank}</span></div>
+    </div>
+    <button class="btn btn-primary" data-primary>${perkNext?'Choose a perk':'Next end'} <span style="opacity:.6;font-weight:500">↵</span></button>
+  </div>`);
+  const go=()=>{ if(perkNext) showPerks(); else { G.end++; loadEnd(); } };
+  m.querySelector('[data-primary]').onclick=go;
+  setTimeout(()=>showOverlay(m, go), 450);
+}
+function showPerks(){
+  const rng=mulberry32((G.seed+G.end*31)>>>0); const pool=PERKS.filter(p=>!(p.id==='wind'&&G.wind)); const picks=[];
+  while(picks.length<3&&pool.length){ picks.push(pool.splice(Math.floor(rng()*pool.length),1)[0]); }
+  const m=h(`<div class="modal"><span class="label">Deeper ice ahead</span><h3>Pick one perk</h3><div class="perks"></div><p>Perks last for this run. Every third end, you pick again.</p></div>`);
+  const box=m.querySelector('.perks');
+  picks.forEach((p,i)=>{ const b=h(`<button class="perk" ${i===0?'data-primary':''}><span class="ico">${p.ico}</span><span><b>${p.name}</b><span>${p.desc}</span></span></button>`);
+    b.onclick=()=>{ applyPerk(p.id); sfx.perfect(); G.end++; loadEnd(); }; box.appendChild(b); });
+  showOverlay(m, null);
+}
+function applyPerk(id){ G.perks.push(id);
+  if(id==='thermos') G.bank+=4; if(id==='scout') G.hints++; if(id==='rewind') G.undos+=2; if(id==='magnet') G.gemVal++; if(id==='sweep') G.perfBonus++; if(id==='wind') G.wind=true; }
+
+function onRunOver(quit){
+  G.busy=true; sfx.lose();
+  const fresh=freshIceAvailable(), base=G.cleared+G.perfects, earned=base*(fresh?2:1);
+  const reached=G.cleared, newBest=reached>S.best, before=S.granite;
+  S.granite+=earned; S.runs++; if(newBest) S.best=reached; if(fresh && base>0) S.freshDay=dayKey(); S.tutorialDone=true; save();
+  const nx=nextUnlock();
+  const m=h(`<div class="modal">
+    <span class="label">${quit?'Run ended':'Out of moves on End '+G.end}</span>
+    <h3>${reached?'You cleared '+reached+' end'+(reached===1?'':'s'):'The ice won this one'}</h3>
+    ${newBest?'<span class="pill hot newbest">New best</span>':S.best?`<span class="pill newbest">Best: End ${S.best}</span>`:''}
+    <div class="ledger">
+      <div><span>Ends cleared</span><b class="num">+${G.cleared}</b></div>
+      <div><span>Perfects</span><b class="num">+${G.perfects}</b></div>
+      ${fresh&&base?`<div><span>Fresh ice ×2</span><b class="num">+${base}</b></div>`:''}
+      <div class="tot"><span>Granite</span><span class="granite num">${S.granite}</span></div>
+    </div>
+    ${nx?`<div><div class="card-head" style="margin-bottom:6px"><span class="label">${S.granite>=nx.cost?'Ready to buy: ':'Next: '}${esc(nx.name)}</span><span class="label num">${Math.min(S.granite,nx.cost)}/${nx.cost}</span></div><div class="progress"><i style="width:${Math.min(100,before/nx.cost*100)}%"></i></div></div>`:''}
+    <div class="row"><button class="btn btn-ghost" id="ws">Workshop</button><button class="btn btn-primary" id="again" data-primary>Run again ↵</button></div>
+    ${!S.daily.done?'<button class="btn btn-ghost" id="dl">Try today\'s Daily Trio</button>':'<p style="text-align:center">Daily Trio refreshes in <b class="num">'+untilMidnight()+'</b></p>'}
+    <button class="btn btn-ghost btn-sm" id="home">Menu</button>
+  </div>`);
+  m.querySelector('#again').onclick=()=>startRun(); m.querySelector('#ws').onclick=renderShop; m.querySelector('#home').onclick=renderHome;
+  const dl=m.querySelector('#dl'); if(dl) dl.onclick=startDaily;
+  setTimeout(()=>{ showOverlay(m, ()=>startRun()); const bar=m.querySelector('.progress i'); if(bar&&nx) setTimeout(()=>bar.style.width=Math.min(100,S.granite/nx.cost*100)+'%',250); }, 500);
+}
+
+function onDailyClear(perfect){
+  const d=S.daily; d.results[G.idx]={moves:G.moves, par:G.L.par}; d.idx=G.idx+1;
+  if(d.idx>=3){ d.done=true; S.streak = (S.lastDaily===yesterdayKey()||S.lastDaily===dayKey()) ? S.streak+(S.lastDaily===dayKey()?0:1) : 1; S.lastDaily=dayKey(); S.bestStreak=Math.max(S.bestStreak,S.streak); S.granite+=5; }
+  save();
+  if(!d.done){
+    const m=h(`<div class="modal"><span class="label">Daily ${G.idx+1}/3</span><h3 class="${perfect?'good':''}">${perfect?'Matched the AI':'+'+(G.moves-G.L.par)+' over par'}</h3>
+      <div class="chips">${[0,1,2].map(i=>chipHtml(d.results[i])).join('')}</div><button class="btn btn-primary" data-primary>Next puzzle ↵</button></div>`);
+    const go=()=>{ G.idx++; loadEnd(); }; m.querySelector('[data-primary]').onclick=go; setTimeout(()=>showOverlay(m,go),450); return;
+  }
+  const m=h(`<div class="modal"><span class="label">Daily Trio #${dailyNumber()} complete</span><h3 class="good">Streak ${S.streak}</h3>
+    <div class="chips">${[0,1,2].map(i=>chipHtml(d.results[i])).join('')}</div>
+    <p>+5 granite for finishing. New puzzles in <b class="num" id="cd2">${untilMidnight()}</b>. Keep the streak alive tomorrow.</p>
+    <div class="row"><button class="btn btn-ghost" id="cp">Copy result</button><button class="btn btn-primary" id="run" data-primary>Start a run ↵</button></div>
+    <button class="btn btn-ghost btn-sm" id="home">Menu</button></div>`);
+  m.querySelector('#cp').onclick=(e)=>copyShare(e.currentTarget); m.querySelector('#run').onclick=startRun; m.querySelector('#home').onclick=renderHome;
+  setTimeout(()=>showOverlay(m, startRun),450);
+}
+
+// ============================ INPUT ============================
+const KEYMAP={ArrowUp:'up',ArrowDown:'down',ArrowLeft:'left',ArrowRight:'right',w:'up',s:'down',a:'left',d:'right',W:'up',S:'down',A:'left',D:'right'};
+window.addEventListener('keydown',e=>{
+  if((e.key==='Enter'||e.key===' ') && overlayPrimary && ovRoot.firstChild){ e.preventDefault(); overlayPrimary(); return; }
+  if(!G || ovRoot.firstChild) return;
+  if(KEYMAP[e.key]){ e.preventDefault(); move(KEYMAP[e.key]); }
+  else if(e.key==='z'||e.key==='u') undo(); else if(e.key==='h') hint(); else if(e.key==='r') resetStone();
+});
+function bindSwipe(el){ let sx=0, sy=0, on=false;
+  el.addEventListener('pointerdown',e=>{ on=true; sx=e.clientX; sy=e.clientY; });
+  el.addEventListener('pointerup',e=>{ if(!on) return; on=false; const dx=e.clientX-sx, dy=e.clientY-sy; if(Math.max(Math.abs(dx),Math.abs(dy))<22) return;
+    move(Math.abs(dx)>Math.abs(dy)?(dx>0?'right':'left'):(dy>0?'down':'up')); });
+  el.addEventListener('pointercancel',()=>on=false);
+}
+
+// ============================ BOOT ============================
+renderHome();
+</script>
